@@ -3,16 +3,22 @@
  * Module dependencies.
  */
 
-var express = require('express')
-  , routes = require('./routes')
-  , http = require('http')
-  , path = require('path')
-  , MongoStore = require('connect-mongo')(express)
-  , settings = require('./settings');
+var express    = require('express');
+var routes     = require('./routes');
+var http       = require('http');
+var path       = require('path');
+var MongoStore = require('connect-mongo')(express);
+var settings   = require('./settings');
 
-var app = express();
+var app =module.exports= express();
+
+//加入日志
+var fs=require('fs');
+var accessLogfile=fs.createWriteStream('access.log', {flag:'a'});
+var errorLogfile=fs.createWriteStream('error.log', {flag:'a'});
 
 app.configure(function(){
+	app.use(express.logger({stream:accessLogfile}));
   app.set('port', process.env.PORT || 3000);
   app.set('views', __dirname + '/views');
   app.set('view engine', 'jade');
@@ -41,7 +47,11 @@ app.configure(function(){
 	next();
 	}); 
   app.use(app.router);
-  //app.use(express.router(routes));
+  app.use(function(err,req,res,next){
+  	var meta='['+new Date() + ']' +req.url +'\n';
+	errorLogfile.write(meta+err.stack+'\n');
+	next();
+  });
   app.use(express.static(path.join(__dirname, 'public')));
 });
 
@@ -49,6 +59,14 @@ app.configure('development', function(){
   app.use(express.errorHandler());
 });
 
+/*app.configure('production',function(){
+	app.error(function(err,req,res,next){
+		var meta='['+new Date() + ']' +req.url +'\n';
+		errorLogfile.write(meta+err.stack+'\n');
+		next();
+	});
+});
+*/
 //视图助手 epress 2.0
 /* app.dynamicHelpers({
 	user:function(req,res){
@@ -79,6 +97,11 @@ app.get('/login',routes.login);
 app.post('/login',routes.doLogin);
 app.get('/logout',routes.logout);
 
-http.createServer(app).listen(app.get('port'), function(){
-  console.log("Express server listening on port " + app.get('port'));
-});
+
+if(!module.parent){
+	    app.listen(app.get('port'), function(){
+  		console.log("Express server listening on port " + app.get('port') );
+	});
+}
+
+
